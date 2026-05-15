@@ -1,3 +1,4 @@
+/* CSC-CMA-PATCH-APPLIED */
 import {
   AnalyticsData,
   AuthTokenDetails,
@@ -26,13 +27,10 @@ export class LinkedinPageProvider
   override refreshWait = true;
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
   override scopes = [
-    'openid',
-    'profile',
-    'w_member_social',
-    'r_basicprofile',
+    'r_organization_admin',
     'rw_organization_admin',
-    'w_organization_social',
     'r_organization_social',
+    'w_organization_social',
   ];
 
   override editor = 'normal' as const;
@@ -59,25 +57,11 @@ export class LinkedinPageProvider
       })
     ).json();
 
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    // CSC CMA-only patch: stub userinfo + me — see linkedin.provider.ts for rationale.
+    const vanityName = 'csc';
+    const id = `cma-${Date.now()}`;
+    const name = 'CSC Admin';
+    const picture = '';
 
     return {
       id,
@@ -233,25 +217,11 @@ export class LinkedinPageProvider
 
     this.checkScopes(this.scopes, scope);
 
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    // CSC CMA-only patch: stub userinfo + me — see linkedin.provider.ts for rationale.
+    const id = `cma-${Date.now()}`;
+    const name = 'CSC Admin';
+    const picture = '';
+    const vanityName = 'csc';
 
     return {
       id: id,

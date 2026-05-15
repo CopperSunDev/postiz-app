@@ -1,3 +1,4 @@
+/* CSC-CMA-PATCH-APPLIED */
 import {
   AuthTokenDetails,
   PostDetails,
@@ -27,13 +28,10 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
   isBetweenSteps = false;
   scopes = [
-    'openid',
-    'profile',
-    'w_member_social',
-    'r_basicprofile',
+    'r_organization_admin',
     'rw_organization_admin',
-    'w_organization_social',
     'r_organization_social',
+    'w_organization_social',
   ];
   override maxConcurrentJob = 2; // LinkedIn has professional posting limits
   refreshWait = true;
@@ -84,25 +82,13 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       })
     ).json();
 
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    // CSC CMA-only patch: /v2/me and /v2/userinfo require OIDC scopes
+    // our CMA-only app cannot grant. Stub with static values; organization
+    // identity is resolved later via companies() + reConnect().
+    const vanityName = 'csc';
+    const id = `cma-${Date.now()}`;
+    const name = 'CSC Admin';
+    const picture = '';
 
     return {
       id,
@@ -110,7 +96,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       refreshToken,
       expiresIn: expires_in,
       name,
-      picture: picture || '',
+      picture,
       username: vanityName,
     };
   }
@@ -164,25 +150,11 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
     this.checkScopes(this.scopes, scope);
 
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    // CSC CMA-only patch: stub userinfo + me — see refreshToken() for rationale.
+    const id = `cma-${Date.now()}`;
+    const name = 'CSC Admin';
+    const picture = '';
+    const vanityName = 'csc';
 
     return {
       id,

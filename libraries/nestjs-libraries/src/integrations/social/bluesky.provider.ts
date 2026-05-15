@@ -1,3 +1,4 @@
+/* CSC-CMA-PATCH-APPLIED */
 import {
   AuthTokenDetails,
   PostDetails,
@@ -141,6 +142,29 @@ async function uploadVideo(
     $type: 'app.bsky.embed.video',
     video: blob,
   } satisfies AppBskyEmbedVideo.Main;
+}
+
+
+async function fetchOGMeta(url: string): Promise<{ title: string; description: string }> {
+  try {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Postiz/1.0' },
+      signal: AbortSignal.timeout(5000),
+    });
+    const html = await resp.text();
+    const titleMatch =
+      html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i) ||
+      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i);
+    const descMatch =
+      html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i) ||
+      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:description"/i);
+    return {
+      title: titleMatch ? titleMatch[1] : '',
+      description: descMatch ? descMatch[1] : '',
+    };
+  } catch (_) {
+    return { title: '', description: '' };
+  }
 }
 
 @Rules(
@@ -319,13 +343,36 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     const agent = await this.getAgent(integration);
     const [firstPost] = postDetails;
 
-    const { embed } = await this.uploadMediaForPost(agent, firstPost);
+    const { embed: mediaEmbed, images } = await this.uploadMediaForPost(agent, firstPost);
 
     const rt = new RichText({
       text: firstPost.message,
     });
 
     await rt.detectFacets(agent);
+
+    // Use external embed (clickable link card) when an image is attached
+    // AND the post text contains a URL detected by RichText.detectFacets.
+    let embed: any = mediaEmbed;
+    if (images.length > 0 && rt.facets && rt.facets.length > 0) {
+      const allFeatures = rt.facets.flatMap((f: any) => f.features || []);
+      const linkFeat = allFeatures.find(
+        (feat: any) => feat.$type === 'app.bsky.richtext.facet#link'
+      );
+      const linkUrl = linkFeat ? linkFeat.uri : (firstPost as any).url || null;
+      if (linkUrl) {
+        const { title, description } = await fetchOGMeta(linkUrl);
+        embed = {
+          $type: 'app.bsky.embed.external',
+          external: {
+            uri: linkUrl,
+            title,
+            description,
+            thumb: images[0].buffer.data.blob,
+          },
+        };
+      }
+    }
 
     // @ts-ignore
     const { cid, uri, commit } = await agent.post({
