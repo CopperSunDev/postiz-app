@@ -27,7 +27,6 @@ export class LinkedinPageProvider
   override refreshWait = true;
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
   override scopes = [
-    'r_organization_admin',
     'rw_organization_admin',
     'r_organization_social',
     'w_organization_social',

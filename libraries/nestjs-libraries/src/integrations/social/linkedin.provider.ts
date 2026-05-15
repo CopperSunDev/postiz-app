@@ -28,7 +28,6 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
   isBetweenSteps = false;
   scopes = [
-    'r_organization_admin',
     'rw_organization_admin',
     'r_organization_social',
     'w_organization_social',
