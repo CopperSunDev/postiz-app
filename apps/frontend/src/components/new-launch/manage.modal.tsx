@@ -1,3 +1,4 @@
+/* CSC-CMA-PATCH-APPLIED */
 'use client';
 
 import React, {
@@ -160,21 +161,15 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       return;
     }
 
-    if (
-      await deleteDialog(
-        t(
-          'are_you_sure_you_want_to_close_this_modal_all_data_will_be_lost',
-          'Are you sure you want to close this modal? (all data will be lost)'
-        ),
-        t('yes_close_it', 'Yes, close it!')
-      )
-    ) {
-      if (customClose) {
-        customClose();
-        return;
-      }
-      modal.closeAll();
+    // CSC patch: bypass discard-changes confirmation on the post-review X
+    // button. Internal workflow uses the script-driven generate -> Postiz
+    // review queue; an extra "Are you sure?" tap each post adds friction
+    // without protecting any work — drafts re-fetch from the calendar.
+    if (customClose) {
+      customClose();
+      return;
     }
+    modal.closeAll();
   }, [activateExitButton, dummy]);
 
   const deletePost = useCallback(async () => {
