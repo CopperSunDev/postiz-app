@@ -145,6 +145,21 @@ async function uploadVideo(
 }
 
 
+function decodeHtmlEntities(s: string): string {
+  if (!s) return s;
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_m, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 async function fetchOGMeta(url: string): Promise<{ title: string; description: string }> {
   try {
     const resp = await fetch(url, {
@@ -159,8 +174,8 @@ async function fetchOGMeta(url: string): Promise<{ title: string; description: s
       html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i) ||
       html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:description"/i);
     return {
-      title: titleMatch ? titleMatch[1] : '',
-      description: descMatch ? descMatch[1] : '',
+      title: decodeHtmlEntities(titleMatch ? titleMatch[1] : ''),
+      description: decodeHtmlEntities(descMatch ? descMatch[1] : ''),
     };
   } catch (_) {
     return { title: '', description: '' };
