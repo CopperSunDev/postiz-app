@@ -200,24 +200,39 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
       { pretty: true }
     );
 
-    const {
-      data: {
-        publishPost: {
-          post: { id: postId, url },
-        },
-      },
-    } = await (
-      await this.fetch('https://gql-beta.hashnode.com', {
+    const requestBody = JSON.stringify({ query });
+    let resp: Response;
+    try {
+      resp = await this.fetch('https://gql-beta.hashnode.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `${accessToken}`,
         },
-        body: JSON.stringify({
-          query,
-        }),
-      })
-    ).json();
+        body: requestBody,
+      });
+    } catch (err: any) {
+      // details[0].json is the raw Hashnode response body (set by BadBody constructor)
+      const hashnodeBody = err?.details?.[0]?.json;
+      console.error('[Hashnode] fetch threw:', err?.type, '| Hashnode response:', hashnodeBody?.slice(0, 1000));
+      throw err;
+    }
+
+    const rawResponse = await resp.text();
+    let parsedResponse: any;
+    try {
+      parsedResponse = JSON.parse(rawResponse);
+    } catch {
+      console.error('[Hashnode] non-JSON response:', rawResponse.slice(0, 500));
+      throw new Error('Hashnode returned non-JSON response');
+    }
+
+    if (parsedResponse?.errors) {
+      console.error('[Hashnode] GQL errors:', JSON.stringify(parsedResponse.errors));
+      throw new Error(`Hashnode GQL error: ${JSON.stringify(parsedResponse.errors)}`);
+    }
+
+    const { id: postId, url } = parsedResponse?.data?.publishPost?.post || {};
 
     return [
       {
