@@ -106,7 +106,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
   }
 
   async tags() {
-    return tags.map((tag) => ({ value: tag.objectID, label: tag.name }));
+    return tags.map((tag) => ({ value: (tag as any).slug || tag.name.toLowerCase().replace(/\s+/g, '-'), label: tag.name }));
   }
 
   @Tool({ description: 'Tags', dataSchema: [] })
@@ -175,7 +175,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
                   ? { originalArticleURL: settings.canonical }
                   : {}),
                 contentMarkdown: postDetails?.[0].message,
-                tags: settings.tags.map((tag: any) => ({ id: tag.value })),
+                tags: settings.tags.map((tag: any) => ({ slug: tag.value, name: tag.label })),
                 ...(settings.subtitle ? { subtitle: settings.subtitle } : {}),
                 ...(settings.main_image
                   ? {
