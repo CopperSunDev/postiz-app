@@ -1,3 +1,4 @@
+/* CSC-CMA-PATCH-APPLIED */
 import {
   AuthTokenDetails,
   PostDetails,
@@ -69,7 +70,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
           me: { name, id, profilePicture, username },
         },
       } = await (
-        await fetch('https://gql.hashnode.com', {
+        await fetch('https://gql-beta.hashnode.com', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -122,7 +123,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
         },
       },
     } = await (
-      await fetch('https://gql.hashnode.com', {
+      await fetch('https://gql-beta.hashnode.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,7 +207,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
         },
       },
     } = await (
-      await this.fetch('https://gql.hashnode.com', {
+      await this.fetch('https://gql-beta.hashnode.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
