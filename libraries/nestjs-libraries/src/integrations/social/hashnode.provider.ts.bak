@@ -1,4 +1,3 @@
-/* CSC-CMA-PATCH-APPLIED */
 import {
   AuthTokenDetails,
   PostDetails,
@@ -70,7 +69,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
           me: { name, id, profilePicture, username },
         },
       } = await (
-        await fetch('https://gql-beta.hashnode.com', {
+        await fetch('https://gql.hashnode.com', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -106,7 +105,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
   }
 
   async tags() {
-    return tags.map((tag) => ({ value: (tag as any).slug || tag.name.toLowerCase().replace(/\s+/g, '-'), label: tag.name }));
+    return tags.map((tag) => ({ value: tag.objectID, label: tag.name }));
   }
 
   @Tool({ description: 'Tags', dataSchema: [] })
@@ -123,7 +122,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
         },
       },
     } = await (
-      await fetch('https://gql-beta.hashnode.com', {
+      await fetch('https://gql.hashnode.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,18 +174,18 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
                   ? { originalArticleURL: settings.canonical }
                   : {}),
                 contentMarkdown: postDetails?.[0].message,
-                tags: settings.tags.map((tag: any) => ({ slug: tag.value, name: tag.label })),
+                tags: settings.tags.map((tag: any) => ({ id: tag.value })),
                 ...(settings.subtitle ? { subtitle: settings.subtitle } : {}),
                 ...(settings.main_image
                   ? {
-                      coverImage: `${
-                        settings?.main_image?.path?.indexOf('http') === -1
-                          ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/${process.env.NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY}`
-                          : ``
-                      }${settings?.main_image?.path}`,
+                      coverImageOptions: {
+                        coverImageURL: `${
+                          settings?.main_image?.path?.indexOf('http') === -1
+                            ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/${process.env.NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY}`
+                            : ``
+                        }${settings?.main_image?.path}`,
+                      },
                     }
-                  : settings.coverImageUrl
-                  ? { coverImage: settings.coverImageUrl }
                   : {}),
               },
             },
@@ -200,49 +199,24 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
       { pretty: true }
     );
 
-    const requestBody = JSON.stringify({ query });
-    let resp: Response;
-    try {
-      resp = await this.fetch('https://gql-beta.hashnode.com', {
+    const {
+      data: {
+        publishPost: {
+          post: { id: postId, url },
+        },
+      },
+    } = await (
+      await this.fetch('https://gql.hashnode.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `${accessToken}`,
         },
-        body: requestBody,
-      });
-    } catch (err: any) {
-      // details[0].json is the raw Hashnode response body (set by BadBody constructor)
-      const hashnodeBody = err?.details?.[0]?.json;
-      console.error('[Hashnode] fetch threw:', err?.type, '| Hashnode response:', hashnodeBody?.slice(0, 1000));
-      throw err;
-    }
-
-    const rawResponse = await resp.text();
-    let parsedResponse: any;
-    try {
-      parsedResponse = JSON.parse(rawResponse);
-    } catch {
-      console.error('[Hashnode] non-JSON response:', rawResponse.slice(0, 500));
-      throw new Error('Hashnode returned non-JSON response');
-    }
-
-    // Patch 8: gql-beta returns INTERNAL_SERVER_ERROR even when the post was
-    // successfully created (known Hashnode quirk). Throwing causes Postiz to
-    // retry, creating duplicate posts. Return synthetic success instead.
-    const postData = parsedResponse?.data?.publishPost?.post;
-    if (!postData && parsedResponse?.errors) {
-      const codes = (parsedResponse.errors as any[]).map((e: any) => e?.extensions?.code as string);
-      const hasRealError = codes.some((c) => c && c !== 'INTERNAL_SERVER_ERROR');
-      if (hasRealError) {
-        console.error('[Hashnode] GQL errors:', JSON.stringify(parsedResponse.errors));
-        throw new Error(`Hashnode GQL error: ${JSON.stringify(parsedResponse.errors)}`);
-      }
-      console.warn('[Hashnode] INTERNAL_SERVER_ERROR (post created despite error — known Hashnode quirk)');
-      return [{ id: postDetails?.[0].id, status: 'completed', postId: 'check-hashnode', releaseURL: '' }];
-    }
-
-    const { id: postId, url } = postData || {};
+        body: JSON.stringify({
+          query,
+        }),
+      })
+    ).json();
 
     return [
       {
