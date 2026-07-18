@@ -53,7 +53,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
     if (body.indexOf('resource is forbidden') > -1) {
       return {
-        type: 'retry',
+        type: 'bad-body',
         value: 'Resource is forbidden',
       };
     }
@@ -175,7 +175,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       throw new Error('Invalid LinkedIn company URL');
     }
 
-    const { elements } = await (
+    const result = await (
       await fetch(
         `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${getCompanyVanity[1]}`,
         {
@@ -189,6 +189,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         }
       )
     ).json();
+    const elements: { localizedName: string; id: string }[] = result?.elements ?? [];
 
     return {
       options: elements.map((e: { localizedName: string; id: string }) => ({
@@ -254,8 +255,30 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     const finalOutput = video || image || document;
 
     const etags = [];
-    for (let i = 0; i < picture.length; i += 1024 * 1024 * 2) {
-      const upload = await this.fetch(
+    if (isVideo) {
+      // Videos use chunked multi-part upload to the per-chunk upload URLs
+      for (let i = 0; i < picture.length; i += 1024 * 1024 * 2) {
+        const upload = await this.fetch(
+          sendUrlRequest,
+          {
+            method: 'PUT',
+            headers: {
+              'X-Restli-Protocol-Version': '2.0.0',
+              'LinkedIn-Version': '202601',
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/octet-stream',
+            },
+            body: picture.slice(i, i + 1024 * 1024 * 2),
+          },
+          'linkedin',
+          0,
+          true
+        );
+        etags.push(upload.headers.get('etag'));
+      }
+    } else {
+      // Images and PDFs use a single PUT (chunked upload corrupts these)
+      await this.fetch(
         sendUrlRequest,
         {
           method: 'PUT',
@@ -263,20 +286,14 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
             'X-Restli-Protocol-Version': '2.0.0',
             'LinkedIn-Version': '202601',
             Authorization: `Bearer ${accessToken}`,
-            ...(isVideo
-              ? { 'Content-Type': 'application/octet-stream' }
-              : isPdf
-              ? { 'Content-Type': 'application/pdf' }
-              : {}),
+            ...(isPdf ? { 'Content-Type': 'application/pdf' } : {}),
           },
-          body: picture.slice(i, i + 1024 * 1024 * 2),
+          body: picture,
         },
         'linkedin',
         0,
         true
       );
-
-      etags.push(upload.headers.get('etag'));
     }
 
     if (isVideo) {

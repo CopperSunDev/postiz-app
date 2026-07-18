@@ -179,7 +179,7 @@ export class LinkedinPageProvider
       name: data.localizedName,
       access_token: accessToken,
       picture:
-        data?.logoV2?.['original~']?.elements?.[0]?.identifiers?.[0].identifier,
+        data?.logoV2?.['original~']?.elements?.[0]?.identifiers?.[0]?.identifier,
       username: data.vanityName,
     };
   }
@@ -534,9 +534,7 @@ export class LinkedinPageProvider
     id: string,
     fields: { likesAmount: string }
   ) {
-    const {
-      likesSummary: { totalLikes },
-    } = await (
+    const repostJson = await (
       await this.fetch(
         `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(id)}`,
         {
@@ -550,6 +548,7 @@ export class LinkedinPageProvider
         }
       )
     ).json();
+    const totalLikes = repostJson?.likesSummary?.totalLikes ?? 0;
 
     if (totalLikes >= +fields.likesAmount) {
       await timer(2000);
@@ -612,9 +611,7 @@ export class LinkedinPageProvider
     id: string,
     fields: { likesAmount: string; post: string }
   ) {
-    const {
-      likesSummary: { totalLikes },
-    } = await (
+    const plugJson = await (
       await this.fetch(
         `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(id)}`,
         {
@@ -628,8 +625,9 @@ export class LinkedinPageProvider
         }
       )
     ).json();
+    const totalLikes = plugJson?.likesSummary?.totalLikes ?? 0;
 
-    if (totalLikes >= fields.likesAmount) {
+    if (totalLikes >= +fields.likesAmount) {
       await timer(2000);
       await this.fetch(
         `https://api.linkedin.com/v2/socialActions/${decodeURIComponent(

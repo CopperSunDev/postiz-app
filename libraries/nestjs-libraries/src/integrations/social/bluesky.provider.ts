@@ -38,8 +38,8 @@ async function reduceImageBySize(url: string, maxSizeKB = 976) {
 
     // Use sharp to get the metadata of the image
     const metadata = await sharp(imageBuffer).metadata();
-    let width = metadata.width!;
-    let height = metadata.height!;
+    let width = metadata.width ?? 1200;
+    let height = metadata.height ?? 630;
 
     // Resize iteratively until the size is below the threshold
     while (imageBuffer.length / 1024 > maxSizeKB) {
@@ -437,6 +437,9 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
 
     // @ts-ignore
     const parentCid = parentThread.data.thread.post?.cid;
+    if (!parentCid) {
+      throw new Error(`Cannot reply: parent post ${parentUri} not found or deleted`);
+    }
     // @ts-ignore
     const rootUri = parentThread.data.thread.post?.record?.reply?.root?.uri || postId;
     // @ts-ignore
