@@ -116,21 +116,16 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
 
   @Tool({ description: 'Publications', dataSchema: [] })
   async publications(accessToken: string) {
-    const {
-      data: {
-        me: {
-          publications: { edges },
-        },
-      },
-    } = await (
-      await fetch('https://gql-beta.hashnode.com', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `${accessToken}`,
-        },
-        body: JSON.stringify({
-          query: `
+    try {
+      const result = await (
+        await fetch('https://gql-beta.hashnode.com', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `${accessToken}`,
+          },
+          body: JSON.stringify({
+            query: `
             query {
               me {
                 publications (first: 50) {
@@ -144,16 +139,17 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
               }
             }
                 `,
-        }),
-      })
-    ).json();
+          }),
+        })
+      ).json();
 
-    return edges.map(
-      ({ node: { id, title } }: { node: { id: string; title: string } }) => ({
-        id,
-        name: title,
-      })
-    );
+      const edges: { node: { id: string; title: string } }[] =
+        result?.data?.me?.publications?.edges ?? [];
+      return edges.map(({ node: { id, title } }) => ({ id, name: title }));
+    } catch (err) {
+      console.error('[Hashnode] publications() failed:', err);
+      return [];
+    }
   }
 
   async post(
@@ -175,7 +171,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
                   ? { originalArticleURL: settings.canonical }
                   : {}),
                 contentMarkdown: postDetails?.[0].message,
-                tags: settings.tags.map((tag: any) => ({ slug: tag.value, name: tag.label })),
+                tags: (settings.tags ?? []).map((tag: any) => ({ slug: tag.value, name: tag.label })),
                 ...(settings.subtitle ? { subtitle: settings.subtitle } : {}),
                 ...(settings.main_image
                   ? {
@@ -232,8 +228,11 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
     // retry, creating duplicate posts. Return synthetic success instead.
     const postData = parsedResponse?.data?.publishPost?.post;
     if (!postData && parsedResponse?.errors) {
-      const codes = (parsedResponse.errors as any[]).map((e: any) => e?.extensions?.code as string);
-      const hasRealError = codes.some((c) => c && c !== 'INTERNAL_SERVER_ERROR');
+      const codes = (parsedResponse.errors as any[]).map((e: any) =>
+        (e?.extensions?.code ?? e?.code ?? '') as string
+      );
+      // Only suppress INTERNAL_SERVER_ERROR — treat any other code (or missing code) as real
+      const hasRealError = !codes.every((c) => c === 'INTERNAL_SERVER_ERROR');
       if (hasRealError) {
         console.error('[Hashnode] GQL errors:', JSON.stringify(parsedResponse.errors));
         throw new Error(`Hashnode GQL error: ${JSON.stringify(parsedResponse.errors)}`);
@@ -242,7 +241,12 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
       return [{ id: postDetails?.[0].id, status: 'completed', postId: 'check-hashnode', releaseURL: '' }];
     }
 
-    const { id: postId, url } = postData || {};
+    if (!postData) {
+      console.error('[Hashnode] unexpected response shape (no post data, no errors):', rawResponse.slice(0, 500));
+      throw new Error('Hashnode returned success shape but contained no post data');
+    }
+
+    const { id: postId, url } = postData;
 
     return [
       {
